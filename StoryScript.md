@@ -26,3 +26,64 @@ Conversation definitions defines a new Command Block with the given name. You ca
 
   1. `data0` - `convo_name` - String value
   2. `extraData` - `extra_data` - Optional. Is a list of strings.
+
+## Narrative
+Syntax: `: <text>` or `<char_name> : <text>`
+
+Narrative is either plain text that describes an action or scene in the current context, or a character is saying something. If the first syntax, the type will be `NARRATIVE` with the following data:
+
+  1. `data0` - `<text>` - The text to display.
+
+Otherwise, if it's the latter syntax, the type will be `DIALOGUE` and with the following data:
+
+  1. `data0` - `<char_name>` - The name of the character. You should get the characters using `parser.getCharacters` and iterate through the array until you find the character command with the matching name. That way, you can also use `data1` of that command to highlight the character name in its respective colour.
+  2. `data1` - `<text>` - The text to display.
+
+If narrative contains a dollar sign, it is likely it is referencing a variable. You should use `parser.parseText` on either `data0` or `data1` as a convenience function to parse this text and return the values for the referenced variables.
+
+## Script
+Syntax: `! <script>`
+
+This would execute a script. The script code is stored inside `data0`. You should use `parser.executeCode` to execute this script when it becomes available. You should also check `parser.AutomaticNext` to determine if you should automatically go to the next command. These are of type `CODE_LINE`.
+
+## Overlays
+Syntax: `~ <text>`
+
+These are 3 second fade delays (in default templates) which displays larger overlay text to emphasise something. They are of type `OVERLAY_TITLE` and contains the following data:
+  
+  1. `data0` - `<text>` - The text to display.
+
+## Conversation Options
+Syntax: `= <option>`
+
+Conversation options are data stored inside the command block itself as individual variables. There are two options currently available:
+
+  1. `EXCLUSIVE` - This, as it is implemented in the HTML5 template, only allows options within choices to appear once in the current conversation.
+  2. `NOCLEAR` - This, as it is implemented in the HTML5 template, prevents the previous conversation from clearing, creating the illusion that you are still in the same conversation.
+
+These options are stored as boolean values inside of the current block as follows:
+
+  1. `isExclusive` - `true` if the choices within the block are exclusive and only appear once. This needs to be implemented yourself.
+  2. `clearCurrent` - `true` if the current conversation (before this block) is cleared from the display as if moving to another conversation.
+
+## Internal Dialogue
+Syntax: `__<var_name> : <text>`
+
+This is similar to dialogue, only the `__` is reserved and is identified as if accessing a variable. This is done internally by the parser, but the actual command type is `INTERNAL_DIALOGUE` instead.
+
+## Choices
+Syntax: `> <text> -> "<convo_name>"`
+
+These are first parsed by the parser as an array to determine if the number of choices exceeds a length of three. If this is the case, this becomes a parser error. Otherwise, it then stores these choices and joins the text and convo_name with a comma, like so:
+
+    "Choice Text to Display,Name of Convo"
+
+Each choice is data from data0 to data2 inside a command block of type `CHOICES`. You will need to split these apart using `string.split(',')` to get the display text and choice name respectively. You can then use `parser.getBlockByTitle` to get the command block for the respective conversation to go to.
+
+## Go to Conversation definition
+Syntax: `:: "<convo_name>"`
+
+This is the conversation goto definition that allows the ability to "goto" another conversation. It has the type of `NEW_CONVO` and stores the following data:
+
+  1. `data0` - `<convo_name>` - The name of the conversation to go to.
+

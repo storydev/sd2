@@ -1,9 +1,12 @@
 package;
 import haxe.Json;
+import haxe.Template;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.Process;
+
+import massive.sys.io.File in MFile;
 
 using StringTools;
 
@@ -48,6 +51,7 @@ class Main
                 
                 var target:String = data.target;
                 var output:String = FileSystem.absolutePath(data.output);
+                
                 convos = data.convos;
                 
                 if (data.source != null)
@@ -66,6 +70,7 @@ class Main
                 {
                     var filePath:String = convos[i];
                     var fileName:String = changePath(filePath);
+                    fileName = fileName.replace(" ", "_");
                     
                     commandLine += '-resource $filePath@$fileName\n';
                 }
@@ -85,6 +90,35 @@ class Main
             Sys.println("Starting build...");
             
             Sys.command("haxe", ["build.hxml"]);
+            Sys.println("Build successful.");
+        }
+        else if (args[0] == "create")
+        {
+            var folderName = args[1];
+            var template = args[2];
+            
+            FileSystem.createDirectory(folderName);
+            Sys.setCwd(Sys.getCwd() + "/" + folderName);
+            
+            var folder:MFile = MFile.create(Sys.getCwd());
+            var _new_assets_folder:MFile = MFile.create(Sys.getCwd() + "/assets");
+            var _assets:MFile = MFile.create(_application_path + "/templates/assets");
+            
+            switch (template)
+            {
+                case "js":
+                    var js_template = _application_path + "/templates/js";
+                    var _original:MFile = MFile.create(js_template);
+                    
+                    Sys.println("Copying template files...");
+                    _original.copyTo(folder);
+                    
+                    var t = new Template(File.getContent("index.html"));
+                    File.saveContent("index.html", t.execute({ game_title: folderName }));
+                    
+                    _assets.copyTo(_new_assets_folder);
+                    Sys.println("Project created successfully.");
+            }
         }
     }
     

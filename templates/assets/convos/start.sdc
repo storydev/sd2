@@ -1,2 +1,2 @@
-$ Start
-! Welcome to your very first interactive story!
+$ "Start"
+: Welcome to your very first interactive story!

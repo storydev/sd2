@@ -42,10 +42,10 @@ class Main
         
         _AutomaticNext = true;
         
-        _interp.variables.set("showCharacterInput", showCharacterInput);
-        _interp.variables.set("goto", script_Goto);
-        
 		p = new Parser("start", _interp, _parser);
+        
+        p.variables.set("showCharacterInput", showCharacterInput);
+        p.variables.set("goto", script_Goto);
         
         content = doc.getElementById("narration");
         choices = doc.getElementById("choice");
@@ -58,44 +58,6 @@ class Main
         _commands = p.getBlockByTitle("Start");
         next();
 	}
-    
-    private static function executeCode(code:String)
-    {
-        try
-        {
-            var exec = _parser.parseString(code);
-            _interp.execute(exec);
-            
-            if (_interp.variables.exists("auto"))
-                _AutomaticNext = _interp.variables.get("auto");
-        }
-        catch (msg:hscript.Expr.Error)
-        {
-            var error = 'Error (${msg.pmin} - ${msg.pmax}): ';
-            
-            switch (msg.e)
-            {
-                case EInvalidChar(c):
-                    error += 'Invalid character ' + String.fromCharCode(c) + '.';
-                case EUnexpected(s):
-                    error += 'Was not expecting $s.';
-                case EUnterminatedString:
-                    error += 'String has not been terminated.';
-                case EUnterminatedComment:
-                    error += 'Multiline comment has not been terminated.';
-                case EUnknownVariable(v):
-                    error += 'The variable $v could not be found.';
-                case EInvalidIterator(v):
-                    error += 'The loop $v is invalid.';
-                case EInvalidOp(op):
-                    error += 'The operator $op is invalid.';
-                case EInvalidAccess(f):
-                    error += 'Do not have access to $f.';
-            }
-            
-            Browser.console.error(error);
-        }
-    }
     
     private static function getCharacter(name:String)
     {
@@ -118,7 +80,7 @@ class Main
             var cmd = _commands.commands[_index++];
             if (cmd.type == NARRATIVE)
             {
-                var eval = parseText(cmd.data0);
+                var eval = p.parseText(cmd.data0);
                 if (cmd.data0.indexOf("::") > -1)
                 {
                     eval = p.parseNarrative(eval);
@@ -129,7 +91,7 @@ class Main
             }
             else if (cmd.type == DIALOGUE)
             {
-                var eval = parseText(cmd.data1);
+                var eval = p.parseText(cmd.data1);
                 if (cmd.data1.indexOf("::") > -1)
                 {
                     eval = p.parseNarrative(eval);
@@ -144,12 +106,12 @@ class Main
             }
             else if (cmd.type == INTERNAL_DIALOGUE)
             {
-                addBasicDialogue(_interp.variables.get(cmd.data0), parseText(cmd.data1));
+                addBasicDialogue(p.variables.get(cmd.data0), p.parseText(cmd.data1));
                 addNextChoice();
             }
             else if (cmd.type == CODE_LINE)
             {
-                executeCode(cmd.data0);
+                p.executeCode(cmd.data0);
                 if (_AutomaticNext)
                     next();
             }
@@ -159,8 +121,6 @@ class Main
             }
             else if (cmd.type == CHOICES)
             {
-                
-                
                 var array = new Array<String>();
                 if (cmd.data0 != "")
                     array.push(cmd.data0);
@@ -172,69 +132,6 @@ class Main
                 addShowChoices(array);
             }
         }
-    }
-    
-    private static function parseText(text:String):String
-    {
-        var replaced:String = text;
-        var ignoredDollarSignInterval = 0;
-        
-        for (i in 0...text.length)
-        {
-            if (ignoredDollarSignInterval > 0)
-                ignoredDollarSignInterval--;
-            
-            if (text.charAt(i) == "\\")
-            {
-                if (text.charAt(i + 1) == "$")
-                    ignoredDollarSignInterval = 2;
-                
-                replaced = StringTools.replace(replaced, "\\", "");
-            }
-            else if (text.charAt(i) == "$" && ignoredDollarSignInterval == 0)
-            {
-                if ((text.charCodeAt(i + 1) > 64 && text.charCodeAt(i + 1) < 91)
-                    || (text.charCodeAt(i + 1) > 96 && text.charCodeAt(i + 1) < 123))
-                {
-                    var field = getStringValue(text, i + 1);
-                    
-                    if (_interp.variables.exists(field))
-                    {
-                        replaced = StringTools.replace(replaced, "$" + field, _interp.variables.get(field));
-                    }
-                    else
-                    {
-                        var result = "The field '" + field + "' could not be parsed or found.";
-                        #if sys
-                        Sys.stderr().writeString(result);
-                        #else
-                        trace(result);
-                        #end
-                    }
-                }
-            }
-        }
-        return replaced;
-    }
-        
-    private static function getStringValue(text:String, startIndex:Int):String
-    {
-        var result = "";
-        for (i in 0...text.length)
-        {
-            if (!validKeyCode(text.charCodeAt(i + startIndex)))
-                break;
-            
-            result += text.charAt(i + startIndex);
-        }
-        return result;
-    }
-    
-    private static function validKeyCode(charCode:Int):Bool
-    {
-        return ((charCode > 64 && charCode < 91)
-                || (charCode > 96 && charCode < 123) || (charCode == 95)
-                || (charCode > 47 && charCode < 58));
     }
 
     private static function addNarrative(value:String)
@@ -352,7 +249,7 @@ class Main
         submit.setAttribute("float", "left");
         submit.onclick = function()
         {
-            _interp.variables.set("name", input.value);
+            p.variables.set("name", input.value);
             choices.innerHTML = "";
             next();
         };

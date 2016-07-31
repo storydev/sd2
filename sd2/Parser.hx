@@ -7,7 +7,7 @@ import js.Lib;
 import js.Browser;
 import hscript.Parser in HParser;
 import hscript.Interp;
-import hscript.Expr.ErrorDef;
+import hscript.Expr.Error;
 
 using sd2.CommandType;
 using StringTools;
@@ -277,7 +277,7 @@ class Parser
             var exec = _parser.parseString(code);
             return "";
         }
-        catch (msg:hscript.Expr.Error)
+        catch (msg:Error)
         {
             processScriptError(msg);
             return "error";
@@ -298,13 +298,13 @@ class Parser
             if (_interp.variables.exists("auto"))
                 _AutomaticNext = _interp.variables.get("auto");
         }
-        catch (msg:hscript.Expr.Error)
+        catch (msg:Error)
         {
             processScriptError(msg);
         }
     }
     
-    private function processScriptError(msg:hscript.Expr.Error)
+    private function processScriptError(msg:Error)
     {
         #if hscriptPos
         var error = 'Error (${msg.pmin} - ${msg.pmax}): ';
@@ -386,6 +386,69 @@ class Parser
                 return _blocks[i];
         }
         return null;
+    }
+    
+    public function parseText(text:String):String
+    {
+        var replaced:String = text;
+        var ignoredDollarSignInterval = 0;
+        
+        for (i in 0...text.length)
+        {
+            if (ignoredDollarSignInterval > 0)
+                ignoredDollarSignInterval--;
+            
+            if (text.charAt(i) == "\\")
+            {
+                if (text.charAt(i + 1) == "$")
+                    ignoredDollarSignInterval = 2;
+                
+                replaced = StringTools.replace(replaced, "\\", "");
+            }
+            else if (text.charAt(i) == "$" && ignoredDollarSignInterval == 0)
+            {
+                if ((text.charCodeAt(i + 1) > 64 && text.charCodeAt(i + 1) < 91)
+                    || (text.charCodeAt(i + 1) > 96 && text.charCodeAt(i + 1) < 123))
+                {
+                    var field = getStringValue(text, i + 1);
+                    
+                    if (_interp.variables.exists(field))
+                    {
+                        replaced = StringTools.replace(replaced, "$" + field, _interp.variables.get(field));
+                    }
+                    else
+                    {
+                        var result = "The field '" + field + "' could not be parsed or found.";
+                        #if sys
+                        Sys.stderr().writeString(result);
+                        #else
+                        trace(result);
+                        #end
+                    }
+                }
+            }
+        }
+        return replaced;
+    }
+        
+    private function getStringValue(text:String, startIndex:Int):String
+    {
+        var result = "";
+        for (i in 0...text.length)
+        {
+            if (!validKeyCode(text.charCodeAt(i + startIndex)))
+                break;
+            
+            result += text.charAt(i + startIndex);
+        }
+        return result;
+    }
+    
+    private function validKeyCode(charCode:Int):Bool
+    {
+        return ((charCode > 64 && charCode < 91)
+                || (charCode > 96 && charCode < 123) || (charCode == 95)
+                || (charCode > 47 && charCode < 58));
     }
     
     public function getBlockById(id:Int)
