@@ -1,3 +1,4 @@
 -cp ./
 -main Main
+-lib mlib
 -neko ../run.n

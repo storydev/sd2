@@ -3,6 +3,9 @@ import haxe.Json;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
+import sys.io.Process;
+
+using StringTools;
 
 class Main
 {
@@ -11,32 +14,86 @@ class Main
     {
         var args = Sys.args();
         var dir:String = args[args.length - 1];
-        dir = dir.substring(0, dir.length - 1);
-        trace(dir);
         
+        var useVerbose = false;
+        var includedCompilationOptions = new Array<String>();
         var _application_path = Sys.getCwd();
-        var command = new Command(args[0], dir);
-        
-        trace(args);
+        var _source_folder = "./";
         
         Sys.setCwd(dir);
         
-        if (command.type == "build")
+        for (i in 1...args.length)
         {
-            for (i in 1...args.length)
+            switch (args[i])
             {
-                switch (args[i])
+                case "-v":
+                    useVerbose = true;
+                    includedCompilationOptions.push(args[i]);
+                case "-D":
+                    includedCompilationOptions.push(args[i] + " " + args[i + 1]);
+                default:
+                    if (args[i].startsWith('-'))
+                        includedCompilationOptions.push(args[i]);
+            }
+        }
+        
+        var commandLine:String = "";
+        var convos = new Array<String>();
+        
+        if (args[0] == "build")
+        {
+            if (FileSystem.exists(dir + "/project.json"))
+            {
+                var data:Dynamic = Json.parse(File.getContent(dir + "/project.json"));
+                
+                var target:String = data.target;
+                var output:String = FileSystem.absolutePath(data.output);
+                convos = data.convos;
+                
+                if (data.source != null)
                 {
-                    case "-v":
-                        command.useVerbose = true;
-                    case "-D":
-                        command.includedCompilationOptions.push(args[i]);
-                        command.includedCompilationOptions.push(args[i + 1]);
+                    if (data.source == "./")
+                        _source_folder = dir;
+                    else
+                        _source_folder = FileSystem.absolutePath(data.source);
                 }
+                else
+                    _source_folder = dir;
+                
+                commandLine = '-cp "$_source_folder"\n -main Main\n -$target "$output"\n -lib sd2\n -lib hscript\n';
+                
+                for (i in 0...convos.length)
+                {
+                    var filePath:String = convos[i];
+                    var fileName:String = changePath(filePath);
+                    
+                    commandLine += '-resource $filePath@$fileName\n';
+                }
+                
+                commandLine += includedCompilationOptions.join(' ') + '\n';
+                
+                File.saveContent("build.hxml", commandLine);
             }
             
-            command.build();
+            if (useVerbose)
+            {
+                Sys.println("Resources used: ");
+                for (i in 0...convos.length)
+                    Sys.println(convos[i]);
+            }
+            
+            Sys.println("Starting build...");
+            
+            Sys.command("haxe", ["build.hxml"]);
         }
+    }
+    
+    private static function changePath(str:String)
+    {
+        if (Sys.systemName() == "Windows" && str.indexOf('\\') > -1)
+            return str.substring(str.lastIndexOf('\\') + 1, str.lastIndexOf('.'));
+        else
+            return str.substring(str.lastIndexOf('/') + 1, str.lastIndexOf('.'));
     }
     
 }
