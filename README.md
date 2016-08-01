@@ -7,6 +7,10 @@ To install, use the `haxelib git` command:
 
     haxelib git sd2 https://github.com/storydev/sd2.git
 
+You can also install from haxelib directly:
+
+	haxelib install sd2
+
 ## Using StoryDev 2
 
 StoryDev 2 comes in two parts: The Parser (the thing that parses your scripts), and the Implementation (the Graphical User Interface that displays and runs the parsed results).
@@ -33,5 +37,18 @@ Here is the simple structure it requires:
 
   1. output - This is the output file or folder (depending on target).
   2. target - This is the target language you want to build to. Follow the [Haxe manual](http://haxe.org/manual/compiler-usage.html) for more information on targets.
-  3. convos - This is an array of strings of all the files to conversations you want to use in your project. Their resource names will be shortened to the name of the file without the extension, so make sure all filenames are unique and do not contain any special characters. Spaces in the file name will create underscores.
+  3. convos - This is the folder path containing all conversations with the `*.sdc` file extension. Make sure the extension exists, or the run module won't pick up the file.
 
+## Community
+
+If you would like to join the community, please feel free to visit our [community forums](http://www.storydev.co.uk/community/). Here, we will keep you up-to-date on news and provide you with the latest version of StoryDev 2.
+
+We also encourage you to use the community forums for posting any feedback you have for this project. Please post there for any particular issues you may have that may not directly be related the engine itself, and rather the templates. You will find we have specific categories for scripting, templates and setting up.
+
+You can also contribute your own custom-made templates or share an interactive story you've been working on.
+
+## Contributions
+
+While we encourage pull requests for improving or fixing bugs in StoryDev 2, please be aware that changes to syntax or the way in which the parser works will not be accepted, unless there is a clear and reasonable explanation as to why.
+
+If you want to contribute templates, please submit them to our [forums](http://www.storydev.co.uk/community/) as this is the best way to reach out to other members of the community. This way, you can also get feedback for your template and, if enough people use it, we may ask for your permission to add it officially later at our discretion.
