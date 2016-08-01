@@ -27,23 +27,17 @@ class Main
     private static var _parser:HParser;
     private static var _index:Int;
     private static var _commands:CommandBlock;
-    private static var _sex:String;
-    private static var _role:String;
     private static var _chosenIndices:Array<Int>;
     
     private static var doc:HTMLDocument = Browser.document;
 	
 	public static function main()
 	{
-        _sex = "male";
-        _role = "cleric";
         _chosenIndices = [];
         
         _parser = new HParser();
         _interp = new Interp();
         
-        _interp.variables.set("sex", _sex);
-        _interp.variables.set("role", _role);
         _interp.variables.set("showCharacterInput", showCharacterInput);
         _interp.variables.set("goto", script_Goto);
         

@@ -182,23 +182,4 @@ class Main
             return str.substring(str.lastIndexOf('/') + 1, str.lastIndexOf('.'));
     }
     
-    private static function searchFolder(folder:String):Array<String>
-    {
-        var results = new Array<String>();
-        
-        var files = FileSystem.readDirectory(folder);
-        for (f in files)
-        {
-            if (FileSystem.isDirectory(f))
-                results = results.concat(searchFolder(f));
-            else
-            {
-                if (f.endsWith(".sdc"))
-                    results.push(f);
-            }
-        }
-        
-        return results;
-    }
-    
 }
