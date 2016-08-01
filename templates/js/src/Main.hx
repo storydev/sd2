@@ -27,25 +27,27 @@ class Main
     private static var _parser:HParser;
     private static var _index:Int;
     private static var _commands:CommandBlock;
+    private static var _sex:String;
+    private static var _role:String;
     private static var _chosenIndices:Array<Int>;
-    
-    private static var _AutomaticNext:Bool;
     
     private static var doc:HTMLDocument = Browser.document;
 	
 	public static function main()
 	{
+        _sex = "male";
+        _role = "cleric";
         _chosenIndices = [];
         
         _parser = new HParser();
         _interp = new Interp();
         
-        _AutomaticNext = true;
+        _interp.variables.set("sex", _sex);
+        _interp.variables.set("role", _role);
+        _interp.variables.set("showCharacterInput", showCharacterInput);
+        _interp.variables.set("goto", script_Goto);
         
 		p = new Parser("start", _interp, _parser);
-        
-        p.variables.set("showCharacterInput", showCharacterInput);
-        p.variables.set("goto", script_Goto);
         
         content = doc.getElementById("narration");
         choices = doc.getElementById("choice");
@@ -106,13 +108,13 @@ class Main
             }
             else if (cmd.type == INTERNAL_DIALOGUE)
             {
-                addBasicDialogue(p.variables.get(cmd.data0), p.parseText(cmd.data1));
+                addBasicDialogue(_interp.variables.get(cmd.data0), p.parseText(cmd.data1));
                 addNextChoice();
             }
             else if (cmd.type == CODE_LINE)
             {
                 p.executeCode(cmd.data0);
-                if (_AutomaticNext)
+                if (p.AutomaticNext)
                     next();
             }
             else if (cmd.type == NEW_CONVO)
@@ -121,6 +123,8 @@ class Main
             }
             else if (cmd.type == CHOICES)
             {
+                
+                
                 var array = new Array<String>();
                 if (cmd.data0 != "")
                     array.push(cmd.data0);
@@ -249,7 +253,7 @@ class Main
         submit.setAttribute("float", "left");
         submit.onclick = function()
         {
-            p.variables.set("name", input.value);
+            _interp.variables.set("name", input.value);
             choices.innerHTML = "";
             next();
         };

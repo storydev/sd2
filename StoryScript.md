@@ -1,5 +1,3 @@
-**Please note that these specifications are incomplete.**
-
 # StoryScript Specifications
 
 StoryScript is the language used to write interactive stories with StoryDev 2. It is specifically designed for storytelling, and these specifications were written to provide the detailed, technical information on how the language is parsed.
@@ -12,7 +10,7 @@ Every file is parsed line-by-line, not character-by-character. And each line is 
 If the end of the current file is reached, the current block is added to the command blocks.
 
 ## Character Definitions
-Syntax: `% "<char_name>" #<colour_value>`
+Syntax: `char "<char_name>" #<colour_value>`
 
 Character definitions define the names of characters, followed by their respective colour value. Their Command is of type `CHARACTER` and their data are as follows:
 
@@ -20,7 +18,7 @@ Character definitions define the names of characters, followed by their respecti
   2. `data1` - `<colour_value>` - Hexadecimal in String value. Use `Std.int` to convert to integer if required.
 
 ## Conversation Definitions
-Syntax: `$ "<convo_name>" (<extra_data>..)`
+Syntax: `convo "<convo_name>" (<extra_data>..)`
 
 Conversation definitions defines a new Command Block with the given name. You can also add extra data, in the form of string values separated by commas. This extra data is stored into `extraData` of the newly defined Command Block. This may be useful if you want to associate the conversation with certain resources within your video game. Their command is of type `BLOCK_START` and their data are as follows:
 
@@ -81,9 +79,16 @@ These are first parsed by the parser as an array to determine if the number of c
 Each choice is data from data0 to data2 inside a command block of type `CHOICES`. You will need to split these apart using `string.split(',')` to get the display text and choice name respectively. You can then use `parser.getBlockByTitle` to get the command block for the respective conversation to go to.
 
 ## Go to Conversation definition
-Syntax: `:: "<convo_name>"`
+Syntax: `goto "<convo_name>"`
 
 This is the conversation goto definition that allows the ability to "goto" another conversation. It has the type of `NEW_CONVO` and stores the following data:
 
   1. `data0` - `<convo_name>` - The name of the conversation to go to.
 
+## Require syntax
+
+    require "<res_name>"
+
+The `require` keyword takes the name of the resource (not the path of the file) that you want to load into the current resource. The parser will read each resource that is linked to the root it is currently parsing and parse those resources first, before then returning to the root resource and parsing that. It does not matter where characters are defined, as these are not used until later in the implementation.
+
+Parsing the resources is recursive, meaning that all resources are parsed and stored in the same instance of the `Parser` itself. Any and all linked resources have their respective `Command`s and `CommandBlock`s available within the same instance as the parser, and thus very little code needs changing.

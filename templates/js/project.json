@@ -2,7 +2,5 @@
     "source": "src/",
     "output": "./sd2.js",
     "target": "js",
-    "convos": [
-        "assets/convos/start.sdc"
-    ]
+    "convos": "assets/convos"
 }

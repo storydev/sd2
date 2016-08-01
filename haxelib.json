@@ -4,7 +4,7 @@
     "license": "MIT",
     "tags": [ "utility" ],
     "description": "A parser for an interactive scripting engine.",
-    "version": "0.1.0-alpha",
-    "releasenote": "Foundations.",
+    "version": "1.0.0",
+    "releasenote": "Release.",
     "contributors": [ "tienery" ]
 }

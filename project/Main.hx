@@ -41,7 +41,7 @@ class Main
         }
         
         var commandLine:String = "";
-        var convos = new Array<String>();
+        var convos:Dynamic = {};
         
         if (args[0] == "build")
         {
@@ -66,13 +66,29 @@ class Main
                 
                 commandLine = '-cp "$_source_folder"\n -main Main\n -$target "$output"\n -lib sd2\n -lib hscript\n';
                 
-                for (i in 0...convos.length)
+                if (Std.is(convos, String))
                 {
-                    var filePath:String = convos[i];
-                    var fileName:String = changePath(filePath);
-                    fileName = fileName.replace(" ", "_");
+                    var files = MFile.create(forceBackslash(FileSystem.absolutePath(convos))).getRecursiveDirectoryListing(new EReg(".sdc", ""));
                     
-                    commandLine += '-resource $filePath@$fileName\n';
+                    for (i in 0...files.length)
+                    {
+                        var filePath:String = files[i].nativePath;
+                        var fileName:String = changePath(filePath);
+                        fileName = fileName.replace(" ", "_");
+                        
+                        commandLine += '-resource $filePath@$fileName\n';
+                    }
+                }
+                else
+                {
+                    for (i in 0...convos.length)
+                    {
+                        var filePath:String = convos[i];
+                        var fileName:String = changePath(filePath);
+                        fileName = fileName.replace(" ", "_");
+                        
+                        commandLine += '-resource $filePath@$fileName\n';
+                    }
                 }
                 
                 commandLine += includedCompilationOptions.join(' ') + '\n';
@@ -120,6 +136,42 @@ class Main
                     Sys.println("Project created successfully.");
             }
         }
+        else if (args[0] == "update")
+        {
+            Sys.println("The update process will copy new source code files and overwrite existing ones in this folder. Are you sure you want to continue? [Y - Yes | N - No]\n");
+            
+            var char = Sys.stdin().readLine();
+            if (char.toLowerCase().indexOf("y") == -1)
+            {
+                Sys.println("Update cancelled.");
+                return;
+            }
+            
+            var projectFile = Sys.getCwd() + "/project.json";
+            if (FileSystem.exists(projectFile))
+            {
+                var src = MFile.create(Sys.getCwd() + "/src");
+                var _origin_src:MFile = null;
+                
+                var target:String = Json.parse(File.getContent(projectFile)).target;
+                switch (target)
+                {
+                    case "js":
+                        Sys.println("Updating source files...");
+                        _origin_src = MFile.create(_application_path + "/templates/js/src");
+                        _origin_src.copyTo(src);
+                        Sys.println("Update successful.");
+                }
+            }
+        }
+    }
+    
+    private static function forceBackslash(path:String):String
+    {
+        if (Sys.systemName() == "Windows")
+            return path.replace("/", "\\");
+        else
+            return path;
     }
     
     private static function changePath(str:String)
@@ -128,6 +180,25 @@ class Main
             return str.substring(str.lastIndexOf('\\') + 1, str.lastIndexOf('.'));
         else
             return str.substring(str.lastIndexOf('/') + 1, str.lastIndexOf('.'));
+    }
+    
+    private static function searchFolder(folder:String):Array<String>
+    {
+        var results = new Array<String>();
+        
+        var files = FileSystem.readDirectory(folder);
+        for (f in files)
+        {
+            if (FileSystem.isDirectory(f))
+                results = results.concat(searchFolder(f));
+            else
+            {
+                if (f.endsWith(".sdc"))
+                    results.push(f);
+            }
+        }
+        
+        return results;
     }
     
 }

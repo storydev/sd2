@@ -22,6 +22,7 @@ class Parser
     private var isAChoice:Bool;
     private var choices:Array<String>;
     private var currentBlock:CommandBlock;
+    private var addedResources:Array<String>;
     
     private var _AutomaticNext:Bool;
     public var AutomaticNext(get, null):Bool;
@@ -36,6 +37,7 @@ class Parser
         
         _blocks = [];
         _commands = [];
+        addedResources = [];
         
         _AutomaticNext = true;
         
@@ -56,18 +58,26 @@ class Parser
         for (i in 0...lines.length)
         {
             var line:String = lines[i];
-            if (i == lines.length - 1)
+            
+            if (line.startsWith("require"))
             {
-                if (currentBlock != null)
+                var pattern = ~/"([^"]+)"/;
+                if (pattern.match(line))
                 {
-                    _blocks.push(currentBlock);
+                    var res = pattern.matched(1);
+                    if (!addRequiredResource(res))
+                        parseFile(res);
                 }
             }
-            
+        }
+        
+        for (i in 0...lines.length)
+        {
+            var line:String = lines[i];
             if (line == "" || line == "\r")
                 continue;
             
-            if (line.startsWith('%'))
+            if (line.startsWith("char"))
             {
                 var values = [];
                 var pattern = ~/"([^"]+)" #([0-9A-Fa-f]+)/;
@@ -81,12 +91,10 @@ class Parser
                     printError('$file : line $i : The character definition is in the wrong format.');
                 }
                 
-                if (currentBlock == null)
-                {
-                    _commands.push(Command.createCharacterCommand(values[0], values[1]));
-                }
+                trace(values);
+                _commands.push(Command.createCharacterCommand(values[0], values[1]));
             }
-            else if (line.startsWith("$"))
+            else if (line.startsWith("convo"))
             {
                 checkChoices();
                 
@@ -118,6 +126,7 @@ class Parser
                 
                 currentBlock = new CommandBlock();
                 currentBlock.id = Command.GLOBAL_ID++;
+                currentBlock.resourceOrigin = file;
                 currentBlock.title = value;
                 currentBlock.extraData = extraData;
             }
@@ -172,7 +181,7 @@ class Parser
                         currentBlock.clearCurrent = false;
                 }
             }
-            else if (line.startsWith("::"))
+            else if (line.startsWith("goto"))
             {
                 checkChoices();
                 
@@ -246,6 +255,14 @@ class Parser
                     values.push(pattern.matched(2));
                 }
                 
+                var firstValue:String = line.split(' ')[0];
+                
+                if (values == [])
+                {
+                    printError('$file : line $i : Unexpected "$firstValue" at the start of this line.');
+                    continue;
+                }
+                
                 if (currentBlock != null)
                 {
                     currentBlock.commands.push(Command.createDialogue(values[0], values[1]));
@@ -255,7 +272,32 @@ class Parser
                     printError('$file : line $i : Dialogue must be placed within a conversation.');
                 }
             }
+            
+            if (i == lines.length - 1)
+            {
+                if (currentBlock != null)
+                {
+                    checkChoices();
+                    _blocks.push(currentBlock);
+                }
+            }
         }
+    }
+    
+    /**
+     * Returns true if the resource already exists.
+     * @param resource
+     * @return
+     */
+    private function addRequiredResource(resource:String):Bool
+    {
+        for (r in addedResources)
+        {
+            if (r == resource)
+                return true;
+        }
+        addedResources.push(resource);
+        return false;
     }
     
     private function checkChoices()
@@ -388,6 +430,11 @@ class Parser
         return null;
     }
     
+    /**
+     * Parses the text, finding dollar signs ($) and converting their respective variable names to their values.
+     * @param text  The text to parse.
+     * @return      Returns the parsed text.
+     */
     public function parseText(text:String):String
     {
         var replaced:String = text;
@@ -419,11 +466,7 @@ class Parser
                     else
                     {
                         var result = "The field '" + field + "' could not be parsed or found.";
-                        #if sys
-                        Sys.stderr().writeString(result);
-                        #else
-                        trace(result);
-                        #end
+                        printError(result);
                     }
                 }
             }

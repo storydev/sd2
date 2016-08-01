@@ -7,11 +7,29 @@ class Command
 
     public static var GLOBAL_ID:Int;
     
+    /**
+     * The ID of the command. This is set internally, do not set!
+     */
     public var id:Int;
+    /**
+     * The type of the command.
+     */
     public var type:Int;
+    /**
+     * The first of the data stored.
+     */
     public var data0:String;
+    /**
+     * The second of the data stored.
+     */
     public var data1:String;
+    /**
+     * The third of the data stored.
+     */
     public var data2:String;
+    /**
+     * The fourth of the data stored.
+     */
     public var data3:String;
     
     public function new()
