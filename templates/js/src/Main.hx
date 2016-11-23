@@ -69,7 +69,7 @@ class Main
     {
         if (_index + 1 > _commands.commands.length)
         {
-            choices.setAttribute("visibility", "hidden");
+            choices.setAttribute("style", "visibility:hidden");
         }
         else
         {
@@ -238,13 +238,13 @@ class Main
         choices.innerHTML = "";
         var input = doc.createInputElement();
         input.type = "text";
-        input.setAttribute("float", "left");
+        input.setAttribute("style", "float:left");
         
         var submit = doc.createButtonElement();
         var confirmText = doc.createTextNode("Confirm");
         submit.appendChild(confirmText);
         
-        submit.setAttribute("float", "left");
+        submit.setAttribute("style", "float:left");
         submit.onclick = function()
         {
             _interp.variables.set("name", input.value);
