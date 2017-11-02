@@ -9,6 +9,15 @@ import hscript.Parser in HParser;
 import hscript.Interp;
 import hscript.Expr.Error;
 
+#if twinspire
+import twinspire.Application;
+#end
+
+#if kha
+import kha.Assets;
+import kha.Blob;
+#end
+
 using sd2.CommandType;
 using StringTools;
 
@@ -31,7 +40,7 @@ class Parser
     public var variables(get, null):Map<String, Dynamic>;
     function get_variables() return _interp.variables;
     
-    public function new(file:String, interp:Interp, parser:HParser)
+    public function new(interp:Interp, parser:HParser)
     {
         Command.GLOBAL_ID = 0;
         
@@ -43,13 +52,23 @@ class Parser
         
         _interp = interp;
         _parser = parser;
-        
-        parseFile(file);
     }
     
     public function parseFile(file:String)
     {
+        #if twinspire
+        var _index = Application.resources.loadMisc(file);
+        var _file:Blob = Application.resources.misc[_index];
+
+        var content = _file.readUtf8String();
+        #elseif kha
+        var _file:Blob = Reflect.field(Assets.fonts, file);
+
+        var content = _file.readUtf8String();
+        #else
         var content = Resource.getString(file);
+
+        #end
         var lines = content.split("\n");
         currentBlock = null;
         isAChoice = false;
