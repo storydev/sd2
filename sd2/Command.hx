@@ -15,25 +15,15 @@ class Command
      * The type of the command.
      */
     public var type:Int;
+
     /**
-     * The first of the data stored.
-     */
-    public var data0:String;
-    /**
-     * The second of the data stored.
-     */
-    public var data1:String;
-    /**
-     * The third of the data stored.
-     */
-    public var data2:String;
-    /**
-     * The fourth of the data stored.
-     */
-    public var data3:String;
+    * The data stored as a series of strings.
+    **/
+    public var data:Array<String>;
     
     public function new()
     {
+        data = [];
     }
     
     public static function createCharacterCommand(characterName:String, color:String):Command
@@ -41,8 +31,8 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = CHARACTER;
-        command.data0 = characterName;
-        command.data1 = color;
+        command.data.push(characterName);
+        command.data.push(color);
         return command;
     }
     
@@ -51,7 +41,7 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = BLOCK_START;
-        command.data0 = name;
+        command.data.push(name);
         return command;
     }
     
@@ -60,7 +50,7 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = NARRATIVE;
-        command.data0 = description;
+        command.data.push(description);
         return command;
     }
     
@@ -69,8 +59,19 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = DIALOGUE;
-        command.data0 = character;
-        command.data1 = dialogue;
+        command.data.push(character);
+        command.data.push(dialogue);
+        return command;
+    }
+
+    public static function createDialogueBlock(character:String, states:Array<String>):Command
+    {
+        var command = new Command();
+        command.id = GLOBAL_ID++;
+        command.type = DIALOGUE_BLOCK;
+        command.data.push(character);
+        for (val in states)
+            command.data.push(val);
         return command;
     }
     
@@ -79,7 +80,7 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = OVERLAY_TITLE;
-        command.data0 = title;
+        command.data.push(title);
         return command;
     }
     
@@ -88,7 +89,7 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = CODE_LINE;
-        command.data0 = code;
+        command.data.push(code);
         return command;
     }
     
@@ -97,8 +98,8 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = INTERNAL_DIALOGUE;
-        command.data0 = char;
-        command.data1 = text;
+        command.data.push(char);
+        command.data.push(text);
         return command;
     }
     
@@ -107,18 +108,18 @@ class Command
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = NEW_CONVO;
-        command.data0 = title;
+        command.data.push(title);
         return command;
     }
     
-    public static function createChoices(choice1:String, choice2:String, choice3:String):Command
+    public static function createChoices(choices:Array<String>):Command
     {
         var command = new Command();
         command.id = GLOBAL_ID++;
         command.type = CHOICES;
-        command.data0 = choice1;
-        command.data1 = choice2;
-        command.data2 = choice3;
+        for (choice in choices)
+            command.data.push(choice);
+        
         return command;
     }
     

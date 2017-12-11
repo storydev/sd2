@@ -29,6 +29,7 @@ class Parser
     private var _interp:Interp;
     private var _parser:HParser;
     private var isAChoice:Bool;
+    private var isDialogueBlock:Bool;
     private var choices:Array<String>;
     private var currentBlock:CommandBlock;
     private var addedResources:Array<String>;
@@ -72,6 +73,12 @@ class Parser
         var lines = content.split("\n");
         currentBlock = null;
         isAChoice = false;
+        isDialogueBlock = false;
+
+        var dialogueName = "";
+        var dialogueValue = "";
+        var dialogueStates = new Array<String>();
+
         choices = [];
         
         for (i in 0...lines.length)
@@ -96,7 +103,25 @@ class Parser
             if (line == "" || line == "\r")
                 continue;
             
-            if (line.startsWith("char"))
+            if (isDialogueBlock)
+            {
+                if (line.indexOf("}") > -1 && currentBlock != null)
+                {
+                    isDialogueBlock = false;
+                    currentBlock.commands.push(Command.createDialogueBlock(dialogueName, dialogueStates));
+                    dialogueStates = [];
+                }
+                else if (currentBlock == null)
+                {
+                    printError('$file : line $i : Dialogue blocks must be placed within a conversation.');
+                }
+                else
+                {
+                    var trimmed = trimSpaces(line);
+                    dialogueStates.push(trimmed);
+                }
+            }
+            else if (line.startsWith("char"))
             {
                 var values = [];
                 var pattern = ~/"([^"]+)" #([0-9A-Fa-f]+)/;
@@ -110,7 +135,6 @@ class Parser
                     printError('$file : line $i : The character definition is in the wrong format.');
                 }
                 
-                trace(values);
                 _commands.push(Command.createCharacterCommand(values[0], values[1]));
             }
             else if (line.startsWith("convo"))
@@ -167,22 +191,15 @@ class Parser
                 isAChoice = true;
                 if (currentBlock != null)
                 {
-                    if (choices.length < 3)
+                    var pattern = ~/([^\->]+) -> "([^"]+)"/;
+                    var value = "";
+                    
+                    if (pattern.match(line))
                     {
-                        var pattern = ~/([^\->]+) -> "([^"]+)"/;
-                        var value = "";
-                        
-                        if (pattern.match(line))
-                        {
-                            value = pattern.matched(1) + "," + pattern.matched(2);
-                        }
-                        
-                        choices.push(value);
+                        value = pattern.matched(1) + "," + pattern.matched(2);
                     }
-                    else
-                    {
-                        printError('$file : line $i : You may not have any more than 3 adjacent choices.');
-                    }
+                    
+                    choices.push(value);
                 }
                 else
                 {
@@ -268,10 +285,21 @@ class Parser
                 
                 var pattern = ~/([^:]+) : (.+)/;
                 var values = [];
+
                 if (pattern.match(line))
                 {
-                    values.push(pattern.matched(1));
-                    values.push(pattern.matched(2));
+                    dialogueName = pattern.matched(1);
+                    dialogueValue = pattern.matched(2);
+
+                    if (dialogueValue.indexOf("{") > -1)
+                    {
+                        isDialogueBlock = true;
+                        dialogueStates = [];
+                        continue;
+                    }
+
+                    values.push(dialogueName);
+                    values.push(dialogueValue);
                 }
                 
                 var firstValue:String = line.split(' ')[0];
@@ -302,6 +330,20 @@ class Parser
             }
         }
     }
+
+    function trimSpaces(value:String)
+    {
+        var index = 0;
+        for (i in 0...value.length)
+        {
+            if (value.charAt(i) == " ")
+                index++;
+            else
+                break;
+        }
+        
+        return value.substr(index);
+    }
     
     /**
      * Returns true if the resource already exists.
@@ -323,9 +365,7 @@ class Parser
     {
         if (isAChoice && currentBlock != null)
         {
-            currentBlock.commands.push(Command.createChoices(choices[0] != null ? choices[0] : "",
-                                            choices[1] != null ? choices[1] : "",
-                                            choices[2] != null ? choices[2] : ""));
+            currentBlock.commands.push(Command.createChoices(choices));
             isAChoice = false;
             choices = [];
         }
