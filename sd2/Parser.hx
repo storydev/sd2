@@ -3,11 +3,10 @@ package sd2;
 import haxe.Constraints.Function;
 import haxe.Resource;
 import haxe.Template;
+#if js
 import js.Lib;
 import js.Browser;
-import hscript.Parser in HParser;
-import hscript.Interp;
-import hscript.Expr.Error;
+#end
 
 #if twinspire
 import twinspire.Application;
@@ -26,33 +25,19 @@ class Parser
 
     private var _blocks:Array<CommandBlock>;
     private var _commands:Array<Command>;
-    private var _interp:Interp;
-    private var _parser:HParser;
     private var isAChoice:Bool;
     private var isDialogueBlock:Bool;
     private var choices:Array<String>;
     private var currentBlock:CommandBlock;
     private var addedResources:Array<String>;
     
-    private var _AutomaticNext:Bool;
-    public var AutomaticNext(get, null):Bool;
-    function get_AutomaticNext() return _AutomaticNext;
-    
-    public var variables(get, null):Map<String, Dynamic>;
-    function get_variables() return _interp.variables;
-    
-    public function new(interp:Interp, parser:HParser)
+    public function new()
     {
         Command.GLOBAL_ID = 0;
         
         _blocks = [];
         _commands = [];
         addedResources = [];
-        
-        _AutomaticNext = true;
-        
-        _interp = interp;
-        _parser = parser;
     }
     
     public function parseFile(file:String)
@@ -75,251 +60,23 @@ class Parser
         isAChoice = false;
         isDialogueBlock = false;
 
-        var dialogueName = "";
-        var dialogueValue = "";
-        var dialogueStates = new Array<String>();
-
         choices = [];
-        
+        var convo = false;
+        var character = false;
+        var overlay = false;
+        var text = "";
+        var narration = false;
+        var dialogue = false;
+        var charName = "";
+        var choiceText = "";
+        var choiceInstruction = "";
+        var optionText = "";
+        var option = false;
+
         for (i in 0...lines.length)
         {
             var line:String = lines[i];
-            
-            if (line.startsWith("require"))
-            {
-                var pattern = ~/"([^"]+)"/;
-                if (pattern.match(line))
-                {
-                    var res = pattern.matched(1);
-                    if (!addRequiredResource(res))
-                        parseFile(res);
-                }
-            }
-        }
-        
-        for (i in 0...lines.length)
-        {
-            var line:String = lines[i];
-            if (line == "" || line == "\r")
-                continue;
-            
-            if (isDialogueBlock)
-            {
-                if (line.indexOf("}") > -1 && currentBlock != null)
-                {
-                    isDialogueBlock = false;
-                    currentBlock.commands.push(Command.createDialogueBlock(dialogueName, dialogueStates));
-                    dialogueStates = [];
-                }
-                else if (currentBlock == null)
-                {
-                    printError('$file : line $i : Dialogue blocks must be placed within a conversation.');
-                }
-                else
-                {
-                    var trimmed = trimSpaces(line);
-                    dialogueStates.push(trimmed);
-                }
-            }
-            else if (line.startsWith("char"))
-            {
-                var values = [];
-                var pattern = ~/"([^"]+)" #([0-9A-Fa-f]+)/;
-                if (pattern.match(line))
-                {
-                    values.push(pattern.matched(1));
-                    values.push(pattern.matched(2));
-                }
-                else
-                {
-                    printError('$file : line $i : The character definition is in the wrong format.');
-                }
-                
-                _commands.push(Command.createCharacterCommand(values[0], values[1]));
-            }
-            else if (line.startsWith("convo"))
-            {
-                checkChoices();
-                
-                var value = "";
-                var extraData = new Array<String>();
-                var pattern = ~/"([^"]+)"/;
-                if (pattern.match(line))
-                {
-                    value = pattern.matched(1);
-                }
-                else
-                {
-                    printError('$file : line $i : The block definition title must be wrapped in speech marks.');
-                }
-                
-                var extraDataPattern = ~/\((("([^"]*)")(,*)[^\)]+)\)/;
-                if (extraDataPattern.match(line))
-                {
-                    var values = extraDataPattern.matched(1).split(",");
-                    for (s in values)
-                    {
-                        if (pattern.match(s))
-                            extraData.push(pattern.matched(1));
-                    }
-                }
-                
-                if (currentBlock != null)
-                    _blocks.push(currentBlock);
-                
-                currentBlock = new CommandBlock();
-                currentBlock.id = Command.GLOBAL_ID++;
-                currentBlock.resourceOrigin = file;
-                currentBlock.title = value;
-                currentBlock.extraData = extraData;
-            }
-            else if (line.startsWith("~"))
-            {
-                checkChoices();
-                
-                if (currentBlock != null)
-                {
-                    currentBlock.commands.push(Command.createOverlayTitle(line.substr(2)));
-                }
-                else
-                {
-                    printError('$file : line $i : Overlay titles must be placed within a conversation.');
-                }
-            }
-            else if (line.startsWith(">"))
-            {
-                isAChoice = true;
-                if (currentBlock != null)
-                {
-                    var pattern = ~/([^\->]+) -> "([^"]+)"/;
-                    var value = "";
-                    
-                    if (pattern.match(line))
-                    {
-                        value = pattern.matched(1) + "," + pattern.matched(2);
-                    }
-                    
-                    choices.push(value);
-                }
-                else
-                {
-                    printError('$file : line $i : Choices must be placed within a conversation.');
-                }
-            }
-            else if (line.startsWith("="))
-            {
-                if (currentBlock != null)
-                {
-                    var value = line.substr(line.indexOf(' ') + 1);
-                    if (value.indexOf("EXCLUSIVE") > -1)
-                        currentBlock.isExclusive = true;
-                    else if (value.indexOf("NOCLEAR") > -1)
-                        currentBlock.clearCurrent = false;
-                }
-            }
-            else if (line.startsWith("goto"))
-            {
-                checkChoices();
-                
-                if (currentBlock != null)
-                {
-                    var pattern = ~/"([^"]+)"/;
-                    var title = "";
-                    if (pattern.match(line))
-                    {
-                        title = pattern.matched(1);
-                    }
-                    
-                    currentBlock.commands.push(Command.createNewConvo(title));
-                }
-                else
-                {
-                    printError('$file : line $i : Goto conversation markers ("::") must be placed within a conversation.');
-                }
-            }
-            else if (line.startsWith(":"))
-            {
-                checkChoices();
-                
-                if (currentBlock != null)
-                {
-                    currentBlock.commands.push(Command.createNarrative(line.substr(2)));
-                }
-                else
-                {
-                    printError('$file : line $i : Narrative must be placed within a conversation.');
-                }
-            }
-            else if (line.startsWith("__"))
-            {
-                checkChoices();
-                
-                if (currentBlock != null)
-                {
-                    var name = line.substring(2, line.indexOf(' '));
-                    var text = line.substr(name.length + 4);
-                    currentBlock.commands.push(Command.createInternalDialogue(name, text));
-                }
-            }
-            else if (line.startsWith("!"))
-            {
-                checkChoices();
-                
-                if (currentBlock != null)
-                {
-                    var code = line.substr(2);
-                    var parsed = parseCode(code);
-                    if (parsed == "")
-                    {
-                        currentBlock.commands.push(Command.createCodeLine(code));
-                    }
-                }
-                else
-                {
-                    printError('$file : line $i : Code lines must be parsed and executed within a conversation.');
-                }
-            }
-            else
-            {
-                checkChoices();
-                
-                var pattern = ~/([^:]+) : (.+)/;
-                var values = [];
 
-                if (pattern.match(line))
-                {
-                    dialogueName = pattern.matched(1);
-                    dialogueValue = pattern.matched(2);
-
-                    if (dialogueValue.indexOf("{") > -1)
-                    {
-                        isDialogueBlock = true;
-                        dialogueStates = [];
-                        continue;
-                    }
-
-                    values.push(dialogueName);
-                    values.push(dialogueValue);
-                }
-                
-                var firstValue:String = line.split(' ')[0];
-                
-                if (values == [])
-                {
-                    printError('$file : line $i : Unexpected "$firstValue" at the start of this line.');
-                    continue;
-                }
-                
-                if (currentBlock != null)
-                {
-                    currentBlock.commands.push(Command.createDialogue(values[0], values[1]));
-                }
-                else
-                {
-                    printError('$file : line $i : Dialogue must be placed within a conversation.');
-                }
-            }
-            
             if (i == lines.length - 1)
             {
                 if (currentBlock != null)
@@ -328,155 +85,226 @@ class Parser
                     _blocks.push(currentBlock);
                 }
             }
+
+            if (line == "" || line == "\r")
+                continue;
+            
+            if (line.endsWith("\r"))
+                line = line.substr(0, line.length - 1);
+
+            var value = line;
+            var data = getNextWord(value);
+            var word = data.word;
+            var first = true;
+            var arrow = false;
+            while (word != "")
+            {
+                switch (word)
+                {
+                    case ">":
+                    {
+                        if (first)
+                        {
+                            isAChoice = true;
+                        }
+                    }
+                    case "->":
+                    {
+                        if (isAChoice)
+                        {
+                            arrow = true;
+                        }
+                    }
+                    case "=":
+                    {
+                        option = true;
+                    }
+                    case "convo":
+                    {
+                        convo = true;
+                    }
+                    case ":":
+                    {
+                        if (!dialogue)
+                            narration = true;
+                    }
+                    case "char":
+                    {
+                        character = true;
+                    }
+                    case "~":
+                    {
+                        overlay = true;
+                    }
+                    default:
+                    {
+                        if (convo || option)
+                        {
+                            text += word;
+                        }
+                        else if (narration || character || dialogue || overlay)
+                        {
+                            text += word + " ";
+                        }
+                        else if (first)
+                        {
+                            charName = word;
+                            dialogue = true;
+                        }
+                        else if (isAChoice)
+                        {
+                            if (arrow)
+                            {
+                                choiceInstruction += word + " ";
+                            }
+                            else
+                            {
+                                choiceText += word + " ";
+                            }
+                        }
+                    }
+                }
+
+                value = data.line;
+                data = getNextWord(value);
+                word = data.word;
+                first = false;
+            }
+
+            if (convo)
+            {
+                checkChoices();
+
+                if (currentBlock != null)
+                {
+                    _blocks.push(currentBlock);
+                    currentBlock = new CommandBlock();
+                }
+                
+                if (currentBlock == null)
+                    currentBlock = new CommandBlock();
+                
+                currentBlock.id = Command.GLOBAL_ID++;
+                currentBlock.title = text;
+                text = "";
+                convo = false;
+            }
+            else if (narration)
+            {
+                checkChoices();
+                text = text.substr(0, text.length - 1);
+                currentBlock.commands.push(Command.createNarrative(text));
+                text = "";
+                narration = false;
+            }
+            else if (character)
+            {
+                checkChoices();
+                text = text.substr(0, text.length - 1);
+                _commands.push(Command.createCharacterCommand(text, ""));
+                text = "";
+                character = false;
+            }
+            else if (dialogue)
+            {
+                checkChoices();
+                text = text.substr(0, text.length - 1);
+                currentBlock.commands.push(Command.createDialogue(charName, text));
+                charName = "";
+                dialogue = false;
+                text = "";
+            }
+            else if (overlay)
+            {
+                checkChoices();
+                text = text.substr(0, text.length - 1);
+                currentBlock.commands.push(Command.createOverlayTitle(text));
+                text = "";
+                overlay = false;
+            }
+            else if (isAChoice)
+            {
+                choiceInstruction = choiceInstruction.substr(0, choiceInstruction.length - 1);
+                choiceText = choiceText.substr(0, choiceText.length - 1);
+                choices.push(choiceText + ";" + choiceInstruction);
+                choiceText = "";
+                choiceInstruction = "";
+            }
+            else if (option)
+            {
+                if (text == "EXCLUSIVE")
+                {
+                    currentBlock.isExclusive = true;
+                }
+            }
         }
     }
 
-    function trimSpaces(value:String)
+
+    function getNextWord(value:String):{ word:String, line:String }
     {
+        var result = "";
         var index = 0;
         for (i in 0...value.length)
         {
-            if (value.charAt(i) == " ")
-                index++;
-            else
+            var char = value.charAt(i);
+            index++;
+            if (char == " ")
                 break;
+            else
+                result += char;
         }
-        
-        return value.substr(index);
+
+        value = value.substr(index);
+        return { word: result, line: value };
     }
     
-    /**
-     * Returns true if the resource already exists.
-     * @param resource
-     * @return
-     */
-    private function addRequiredResource(resource:String):Bool
-    {
-        for (r in addedResources)
-        {
-            if (r == resource)
-                return true;
-        }
-        addedResources.push(resource);
-        return false;
-    }
-    
-    private function checkChoices()
+    function checkChoices()
     {
         if (isAChoice && currentBlock != null)
         {
             currentBlock.commands.push(Command.createChoices(choices));
             isAChoice = false;
             choices = [];
+            _blocks.push(currentBlock);
+            currentBlock = new CommandBlock();
         }
     }
-    
-    private function parseCode(code:String)
+
+    function printError(error:String)
     {
-        try
-        {
-            var exec = _parser.parseString(code);
-            return "";
-        }
-        catch (msg:Error)
-        {
-            processScriptError(msg);
-            return "error";
-        }
-    }
-    
-    /**
-     * Execute the given code.
-     * @param code  The code to execute.
-     */
-    public function executeCode(code:String)
-    {
-        try
-        {
-            var exec = _parser.parseString(code);
-            _interp.execute(exec);
-            
-            if (_interp.variables.exists("auto"))
-                _AutomaticNext = _interp.variables.get("auto");
-        }
-        catch (msg:Error)
-        {
-            processScriptError(msg);
-        }
-    }
-    
-    private function processScriptError(msg:Error)
-    {
-        #if hscriptPos
-        var error = 'Error (${msg.pmin} - ${msg.pmax}): ';
-        var _msg = msg.e;
+        #if js
+        Browser.console.error(error);
+        #elseif sys
+        Sys.stderr().writeString(error);
         #else
-        var error = 'Error: ';
-        var _msg = msg;
+        trace(error);
         #end
-        
-        switch (_msg)
-        {
-            case EInvalidChar(c):
-                error += 'Invalid character ' + String.fromCharCode(c) + '.';
-            case EUnexpected(s):
-                error += 'Was not expecting $s.';
-            case EUnterminatedString:
-                error += 'String has not been terminated.';
-            case EUnterminatedComment:
-                error += 'Multiline comment has not been terminated.';
-            case EUnknownVariable(v):
-                error += 'The variable $v could not be found.';
-            case EInvalidIterator(v):
-                error += 'The loop $v is invalid.';
-            case EInvalidOp(op):
-                error += 'The operator $op is invalid.';
-            case EInvalidAccess(f):
-                error += 'Do not have access to $f.';
-        }
-        
-        
-        printError(error);
     }
     
-    /**
-     * Parses the narrative and returns the evaluated result.
-     * @param value     The value of the narrative.
-     */
-    public function parseNarrative(value:String)
-    {
-        var result = "";
-        var template = new Template(value);
-        var d:Dynamic = {};
-        for (key in _interp.variables.keys())
-        {
-            var value:Dynamic = _interp.variables.get(key);
-            if (key != "true" && key != "false" && key != "null" && key != "trace" && !Reflect.isFunction(value))
-                Reflect.setField(d, key, value);
-        }
-        
-        return template.execute(d);
-    }
+/**
+* PUBLIC FUNCTIONS
+**/
     
     /**
      * Get all the characters defined in the file as commands.
      */
     public function getCharacters()
     {
-        var commands = new Array<Command>();
+        var commands = new Array<String>();
         for (i in 0..._commands.length)
         {
             var cm = _commands[i];
             if (cm.type == CHARACTER)
             {
-                commands.push(cm);
+                commands.push(cm.data[0]);
             }
         }
         return commands;
     }
     
     /**
-     * Get a block of commands by the given title. The title of a block is denoted by a '$' sign.
+     * Get a block of commands by the given title. The title of a block is denoted by 'convo'.
      * @param title     The title to look for.
      */
     public function getBlockByTitle(title:String)
@@ -490,69 +318,9 @@ class Parser
     }
     
     /**
-     * Parses the text, finding dollar signs ($) and converting their respective variable names to their values.
-     * @param text  The text to parse.
-     * @return      Returns the parsed text.
-     */
-    public function parseText(text:String):String
-    {
-        var replaced:String = text;
-        var ignoredDollarSignInterval = 0;
-        
-        for (i in 0...text.length)
-        {
-            if (ignoredDollarSignInterval > 0)
-                ignoredDollarSignInterval--;
-            
-            if (text.charAt(i) == "\\")
-            {
-                if (text.charAt(i + 1) == "$")
-                    ignoredDollarSignInterval = 2;
-                
-                replaced = StringTools.replace(replaced, "\\", "");
-            }
-            else if (text.charAt(i) == "$" && ignoredDollarSignInterval == 0)
-            {
-                if ((text.charCodeAt(i + 1) > 64 && text.charCodeAt(i + 1) < 91)
-                    || (text.charCodeAt(i + 1) > 96 && text.charCodeAt(i + 1) < 123))
-                {
-                    var field = getStringValue(text, i + 1);
-                    
-                    if (_interp.variables.exists(field))
-                    {
-                        replaced = StringTools.replace(replaced, "$" + field, _interp.variables.get(field));
-                    }
-                    else
-                    {
-                        var result = "The field '" + field + "' could not be parsed or found.";
-                        printError(result);
-                    }
-                }
-            }
-        }
-        return replaced;
-    }
-        
-    private function getStringValue(text:String, startIndex:Int):String
-    {
-        var result = "";
-        for (i in 0...text.length)
-        {
-            if (!validKeyCode(text.charCodeAt(i + startIndex)))
-                break;
-            
-            result += text.charAt(i + startIndex);
-        }
-        return result;
-    }
-    
-    private function validKeyCode(charCode:Int):Bool
-    {
-        return ((charCode > 64 && charCode < 91)
-                || (charCode > 96 && charCode < 123) || (charCode == 95)
-                || (charCode > 47 && charCode < 58));
-    }
-    
+    * Get a block of commands by the given id.
+    * @param id The identifier to look for.
+    **/
     public function getBlockById(id:Int)
     {
         for (i in 0..._blocks.length)
@@ -562,16 +330,10 @@ class Parser
         }
         return null;
     }
-    
-    private function printError(error:String)
-    {
-        #if js
-        Browser.console.error(error);
-        #elseif sys
-        Sys.stderr().writeString(error);
-        #else
-        trace(error);
-        #end
-    }
+
+    /**
+    * Return all the parsed blocks/conversations.
+    **/
+    public function getBlocks() return _blocks;
     
 }
