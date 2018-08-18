@@ -107,8 +107,13 @@ The parser will parse files character by character without regular expressions f
 ## Syntax Options
 
 `convo` or `#` defines a conversation or dialogue block. Syntax: `convo Start`
+
 `char` defines a character. This is a convenience method which you can use to get colour data if necessary. Syntax: `char Saniyah #00665d`. Colours are optional.
+
 `:` indicates either narrative or dialogue. If a character name is given to the left of the colon, it is parsed as type `DIALOGUE` than `NARRATIVE`. Syntax: `[Character] : This is some dialogue.`
+
 `~` indicates overlay. Overlay is perhaps more often used outside of any dialogue, such as in subtitles in a cutscene. Syntax: `~ This is some overlay.`
+
 `>` indicates choice. This is typically used at the end of conversations, but can be used anywhere. Syntax: `> Display Text -> Go To`
+
 `=` indicates option. This is only really used for the `EXCLUSIVE` option, such as in `= EXCLUSIVE` which marks a block's member variable `isExclusive` true. This can be used for choice hubs, where choices can be hidden once activated. Currently, the parser does not do anything else with this option value.
