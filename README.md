@@ -21,7 +21,7 @@ The parser is what exists, whereas the implementation is up to you to decide. Th
 
 The language is very simple to learn and use. Take a look at the following example:
 
-```haxe
+```
 convo Start
 : Welcome to your first interactive story!
 Caroline : Hi!

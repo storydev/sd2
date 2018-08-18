@@ -17,6 +17,10 @@ import kha.Assets;
 import kha.Blob;
 #end
 
+#if (sys || hxnodejs)
+import sys.io.File;
+#end
+
 using sd2.CommandType;
 using StringTools;
 
@@ -30,6 +34,7 @@ class Parser
     private var choices:Array<String>;
     private var currentBlock:CommandBlock;
     private var addedResources:Array<String>;
+    private var blocksAdded:Int = 0;
     
     public function new()
     {
@@ -39,27 +44,57 @@ class Parser
         _commands = [];
         addedResources = [];
     }
-    
-    public function parseFile(file:String)
+
+    /**
+    * If for some reason you want to clear all the parsed content,
+    * you can do so by calling this function.
+    **/
+    public function clear()
     {
-        #if twinspire
-        var _index = Application.resources.loadMisc(file);
-        var _file:Blob = Application.resources.misc[_index];
+        _blocks = [];
+        _commands = [];
+    }
+    
+    /**
+    * Parse a file into `CommandBlock`s. Returns an integer value that indicates
+    * the number of `CommandBlock`s generated. This can be useful if you need to
+    * manage the layout of your conversations according to your application.
+    **/
+    public function parseFile(file:String, filesystem:Bool = false):Int
+    {
+        var content = "";
 
-        var content = _file.readUtf8String();
-        #elseif kha
-        var _file:Blob = Reflect.field(Assets.fonts, file);
+        if (filesystem)
+        {
+            #if (sys || hxnodejs)
+            content = File.getContent(file);
+            #end
+        }
+        else
+        {
+            #if twinspire
+            var _index = Application.resources.loadMisc(file);
+            var _file:Blob = Application.resources.misc[_index];
 
-        var content = _file.readUtf8String();
-        #else
-        var content = Resource.getString(file);
+            content = _file.readUtf8String();
+            #elseif kha
+            var _file:Blob = Reflect.field(Assets.fonts, file);
 
-        #end
+            content = _file.readUtf8String();
+            #else
+            content = Resource.getString(file);
+
+            #end
+        }
+
         var lines = content.split("\n");
         currentBlock = null;
         isAChoice = false;
         isDialogueBlock = false;
+        blocksAdded = 0;
 
+        // setup the local variables
+        // don't need tokenisation because we are simple.
         choices = [];
         var convo = false;
         var character = false;
@@ -68,6 +103,7 @@ class Parser
         var narration = false;
         var dialogue = false;
         var charName = "";
+        var charColor = "";
         var choiceText = "";
         var choiceInstruction = "";
         var optionText = "";
@@ -81,8 +117,11 @@ class Parser
             {
                 if (currentBlock != null)
                 {
-                    checkChoices();
-                    _blocks.push(currentBlock);
+                    if (!checkChoices())
+                    {
+                        _blocks.push(currentBlock);
+                        blocksAdded++;
+                    }
                 }
             }
 
@@ -92,9 +131,12 @@ class Parser
             if (line.endsWith("\r"))
                 line = line.substr(0, line.length - 1);
 
+            // set up the value and get the entire line
             var value = line;
+            // get the next word, which returns to us the word itself, and the rest of the line.
             var data = getNextWord(value);
             var word = data.word;
+            // this is the first word in the line
             var first = true;
             var arrow = false;
             while (word != "")
@@ -119,7 +161,7 @@ class Parser
                     {
                         option = true;
                     }
-                    case "convo":
+                    case "convo", "#":
                     {
                         convo = true;
                     }
@@ -127,28 +169,42 @@ class Parser
                     {
                         if (!dialogue)
                             narration = true;
+                        else
+                        {
+                            charName = text;
+                            text = "";
+                        }
                     }
                     case "char":
                     {
-                        character = true;
+                        if (first)
+                            character = true;
+                        else (dialogue || narration || overlay)
+                            text += word + " ";
                     }
                     case "~":
                     {
-                        overlay = true;
+                        if (first)
+                            overlay = true;
                     }
                     default:
                     {
-                        if (convo || option)
+                        if (option)
                         {
                             text += word;
                         }
-                        else if (narration || character || dialogue || overlay)
+                        else if (narration || character || dialogue || overlay || convo)
                         {
-                            text += word + " ";
+                            if (character && word.startsWith("#"))
+                                charColor = word;
+                            else
+                            {
+                                text += word + " ";
+                            }
                         }
                         else if (first)
                         {
-                            charName = word;
+                            text = word + " ";
                             dialogue = true;
                         }
                         else if (isAChoice)
@@ -165,12 +221,15 @@ class Parser
                     }
                 }
 
+                // set the value to the rest of the line and get the next word.
                 value = data.line;
                 data = getNextWord(value);
                 word = data.word;
                 first = false;
             }
 
+            // check what happened when we parsed the line and create
+            // commands/blocks accordingly.
             if (convo)
             {
                 checkChoices();
@@ -178,6 +237,7 @@ class Parser
                 if (currentBlock != null)
                 {
                     _blocks.push(currentBlock);
+                    blocksAdded++;
                     currentBlock = new CommandBlock();
                 }
                 
@@ -185,7 +245,8 @@ class Parser
                     currentBlock = new CommandBlock();
                 
                 currentBlock.id = Command.GLOBAL_ID++;
-                currentBlock.title = text;
+                currentBlock.title = text.substr(0, text.length - 1);
+                currentBlock.resourceOrigin = file;
                 text = "";
                 convo = false;
             }
@@ -201,7 +262,7 @@ class Parser
             {
                 checkChoices();
                 text = text.substr(0, text.length - 1);
-                _commands.push(Command.createCharacterCommand(text, ""));
+                _commands.push(Command.createCharacterCommand(text, charColor));
                 text = "";
                 character = false;
             }
@@ -209,6 +270,7 @@ class Parser
             {
                 checkChoices();
                 text = text.substr(0, text.length - 1);
+                charName = charName.substr(0, charName.length - 1);
                 currentBlock.commands.push(Command.createDialogue(charName, text));
                 charName = "";
                 dialogue = false;
@@ -224,6 +286,12 @@ class Parser
             }
             else if (isAChoice)
             {
+                if (!arrow)
+                {
+                    postError('Line $i: There must be an `->` arrow that indicates where to go in a choice.');
+                    return -1;
+                }
+
                 choiceInstruction = choiceInstruction.substr(0, choiceInstruction.length - 1);
                 choiceText = choiceText.substr(0, choiceText.length - 1);
                 choices.push(choiceText + ";" + choiceInstruction);
@@ -236,8 +304,60 @@ class Parser
                 {
                     currentBlock.isExclusive = true;
                 }
+
+                text = "";
+                option = false;
+            }
+            else
+            {
+                printError('Invalid syntax at line $i. What we\'re you trying to do?');
+                return -1;
             }
         }
+
+        return blocksAdded;
+    }
+
+    public function generateContent(block:CommandBlock)
+    {
+        var content = "";
+        if (block.title == null) return "";
+
+        content = "convo " + block.title + "\n";
+        if (block.isExclusive)
+            content += "= EXCLUSIVE\n";
+
+        for (i in 0...block.commands.length)
+        {
+            var command = block.commands[i];
+            switch (command.type)
+            {
+                case CommandType.NARRATIVE:
+                {
+                    content += ": " + command.data[0] + "\n";
+                }
+                case CommandType.DIALOGUE:
+                {
+                    content += command.data[0] + " : " + command.data[1] + "\n";
+                }
+                case CommandType.OVERLAY_TITLE:
+                {
+                    content += "~ " + command.data[0] + "\n";
+                }
+                case CommandType.CHOICES:
+                {
+                    for (data in command.data)
+                    {
+                        var index = data.indexOf(";");
+                        var choiceText = data.substr(0, index);
+                        var choiceInstruction = data.substr(index + 1);
+                        content += "> " + choiceText + " -> " + choiceInstruction + "\n";
+                    }
+                }
+            }
+        }
+
+        return content;
     }
 
 
@@ -261,14 +381,17 @@ class Parser
     
     function checkChoices()
     {
+        var result = false;
         if (isAChoice && currentBlock != null)
         {
             currentBlock.commands.push(Command.createChoices(choices));
             isAChoice = false;
             choices = [];
-            _blocks.push(currentBlock);
-            currentBlock = new CommandBlock();
+
+            result = true;
         }
+
+        return result;
     }
 
     function printError(error:String)
@@ -291,13 +414,13 @@ class Parser
      */
     public function getCharacters()
     {
-        var commands = new Array<String>();
+        var commands = new Array<Command>();
         for (i in 0..._commands.length)
         {
             var cm = _commands[i];
             if (cm.type == CHARACTER)
             {
-                commands.push(cm.data[0]);
+                commands.push(cm);
             }
         }
         return commands;
