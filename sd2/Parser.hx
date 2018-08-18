@@ -179,7 +179,7 @@ class Parser
                     {
                         if (first)
                             character = true;
-                        else (dialogue || narration || overlay)
+                        else if (dialogue || narration || overlay)
                             text += word + " ";
                     }
                     case "~":
@@ -310,7 +310,7 @@ class Parser
             }
             else
             {
-                printError('Invalid syntax at line $i. What we\'re you trying to do?');
+                postError('Invalid syntax at line $i. What we\'re you trying to do?');
                 return -1;
             }
         }
@@ -394,7 +394,7 @@ class Parser
         return result;
     }
 
-    function printError(error:String)
+    function postError(error:String)
     {
         #if js
         Browser.console.error(error);
