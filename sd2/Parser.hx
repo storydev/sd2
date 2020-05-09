@@ -115,18 +115,6 @@ class Parser
         {
             var line:String = lines[i];
 
-            if (i == lines.length - 1)
-            {
-                if (currentBlock != null)
-                {
-                    if (!checkChoices())
-                    {
-                        _blocks.push(currentBlock);
-                        blocksAdded++;
-                    }
-                }
-            }
-
             if (line == "" || line == "\r")
                 continue;
             
@@ -210,6 +198,7 @@ class Parser
                             else if (isCode)
                             {
                                 codeText += value;
+                                break;
                             }
                             else 
                             {
@@ -316,6 +305,7 @@ class Parser
                 choices.push(choiceText + "|" + choiceInstruction);
                 choiceText = "";
                 choiceInstruction = "";
+                codeText = "";
             }
             else if (isCode)
             {
@@ -337,6 +327,16 @@ class Parser
             {
                 postError('Invalid syntax at line $i. What we\'re you trying to do?');
                 return -1;
+            }
+
+            if (i == lines.length - 1)
+            {
+                if (currentBlock != null)
+                {
+                    checkChoices();
+                    _blocks.push(currentBlock);
+                    blocksAdded++;
+                }
             }
         }
 
