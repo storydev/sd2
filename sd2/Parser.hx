@@ -102,12 +102,14 @@ class Parser
         var text = "";
         var narration = false;
         var dialogue = false;
+        var isCode = false;
         var charName = "";
         var charColor = "";
         var choiceText = "";
         var choiceInstruction = "";
         var optionText = "";
         var option = false;
+        var codeText = "";
 
         for (i in 0...lines.length)
         {
@@ -159,7 +161,8 @@ class Parser
                     }
                     case "=":
                     {
-                        option = true;
+                        if (!isCode)
+                            option = true;
                     }
                     case "convo", "#":
                     {
@@ -167,12 +170,15 @@ class Parser
                     }
                     case ":":
                     {
-                        if (!dialogue)
-                            narration = true;
-                        else
+                        if (!isCode)
                         {
-                            charName = text;
-                            text = "";
+                            if (!dialogue)
+                                narration = true;
+                            else
+                            {
+                                charName = text;
+                                text = "";
+                            }
                         }
                     }
                     case "char":
@@ -187,17 +193,25 @@ class Parser
                         if (first)
                             overlay = true;
                     }
+                    case "!":
+                    {
+                        isCode = true;
+                    }
                     default:
                     {
                         if (option)
                         {
                             text += word;
                         }
-                        else if (narration || character || dialogue || overlay || convo)
+                        else if (narration || character || dialogue || overlay || convo || isCode)
                         {
                             if (character && word.startsWith("#"))
                                 charColor = word;
-                            else
+                            else if (isCode)
+                            {
+                                codeText += value;
+                            }
+                            else 
                             {
                                 text += word + " ";
                             }
@@ -292,11 +306,22 @@ class Parser
                     return -1;
                 }
 
-                choiceInstruction = choiceInstruction.substr(0, choiceInstruction.length - 1);
+                if (isCode)
+                    choiceInstruction = codeText;
+                
+                if (!isCode)
+                    choiceInstruction = choiceInstruction.substr(0, choiceInstruction.length - 1);
+                
                 choiceText = choiceText.substr(0, choiceText.length - 1);
                 choices.push(choiceText + ";" + choiceInstruction);
                 choiceText = "";
                 choiceInstruction = "";
+            }
+            else if (isCode)
+            {
+                currentBlock.commands.push(Command.createCodeLine(codeText));
+                codeText = "";
+                isCode = false;
             }
             else if (option)
             {
@@ -343,6 +368,10 @@ class Parser
                 case CommandType.OVERLAY_TITLE:
                 {
                     content += "~ " + command.data[0] + "\n";
+                }
+                case CommandType.CODE_LINE:
+                {
+                    content += "! " + command.data[0] + "\n";
                 }
                 case CommandType.CHOICES:
                 {

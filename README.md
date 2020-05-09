@@ -35,7 +35,7 @@ Let's break this down into each line:
 
  1. The `convo` keyword indicates the start of a dialogue block or conversation. Each `convo` is parsed into the parser as a `CommandBlock` and the title is passed in.
  2. Anything preceding `:` is either narrative or dialogue. If the left-side of the colon is *not* empty, this indicates dialogue with the given character name. Character's can be defined with the `char` keyword. More on this later.
- 3. Lines with `>` is typically used at the end of the conversation, which indicate choices to be made. Choices can indeed be offered in the middle of a conversation and the parser will not prompt an error. They have the syntax `> [Display Text] -> [Conversation to go to]`.
+ 3. Lines with `>` is typically used at the end of the conversation, which indicate choices to be made. Choices can indeed be offered in the middle of a conversation and the parser will not prompt an error. They have the syntax `> [Display Text] -> [Conversation to go to]`. You can also specify code to be executed in place of a conversation to go to, by using the `!` preceding the code text.
 
 ### Implementation Detail
 
@@ -117,3 +117,5 @@ The parser will parse files character by character without regular expressions f
 `>` indicates choice. This is typically used at the end of conversations, but can be used anywhere. Syntax: `> Display Text -> Go To`
 
 `=` indicates option. This is only really used for the `EXCLUSIVE` option, such as in `= EXCLUSIVE` which marks a block's member variable `isExclusive` true. This can be used for choice hubs, where choices can be hidden once activated. Currently, the parser does not do anything else with this option value.
+
+`!` indicates code. You can use and execute code as a single line in the middle of conversations, or you can use them in place of conversations to go to in the case of choices. Be sure that in implementation you record whether or not you have already executed the code to prevent unwanted results.
