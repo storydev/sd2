@@ -313,7 +313,7 @@ class Parser
                     choiceInstruction = choiceInstruction.substr(0, choiceInstruction.length - 1);
                 
                 choiceText = choiceText.substr(0, choiceText.length - 1);
-                choices.push(choiceText + ";" + choiceInstruction);
+                choices.push(choiceText + "|" + choiceInstruction);
                 choiceText = "";
                 choiceInstruction = "";
             }
