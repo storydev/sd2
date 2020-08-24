@@ -122,5 +122,14 @@ class Command
         
         return command;
     }
+
+    public static function createGoto(convoName:String):Command
+    {
+        var command = new Command();
+        command.id = GLOBAL_ID++;
+        command.type = GOTO;
+        command.data.push(convoName);
+        return command;
+    }
     
 }

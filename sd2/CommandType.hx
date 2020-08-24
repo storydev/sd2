@@ -12,4 +12,5 @@ abstract CommandType(Int) from Int to Int {
     var NEW_CONVO:Int           = 7;
     var CHOICES:Int             = 8;
     var DIALOGUE_BLOCK:Int      = 9;
+    var GOTO:Int                = 10;
 }

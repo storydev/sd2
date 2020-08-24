@@ -35,6 +35,8 @@ class Parser
     private var currentBlock:CommandBlock;
     private var addedResources:Array<String>;
     private var blocksAdded:Int = 0;
+
+    public var usingKha:Bool = false;
     
     public function new()
     {
@@ -73,12 +75,21 @@ class Parser
         else
         {
             #if twinspire
-            var _index = Application.resources.loadMisc(file);
-            var _file:Blob = Application.resources.misc[_index];
+            if (usingKha)
+            {
+                var _file:Blob = Reflect.field(Assets.blobs, file);
 
-            content = _file.readUtf8String();
+                content = _file.readUtf8String();
+            }
+            else 
+            {
+                var _index = Application.resources.loadMisc(file);
+                var _file:Blob = Application.resources.misc[_index];
+
+                content = _file.readUtf8String();
+            }
             #elseif kha
-            var _file:Blob = Reflect.field(Assets.fonts, file);
+            var _file:Blob = Reflect.field(Assets.blobs, file);
 
             content = _file.readUtf8String();
             #else
@@ -103,6 +114,7 @@ class Parser
         var narration = false;
         var dialogue = false;
         var isCode = false;
+        var isGoto = false;
         var charName = "";
         var charColor = "";
         var choiceText = "";
@@ -185,9 +197,13 @@ class Parser
                     {
                         isCode = true;
                     }
+                    case "goto":
+                    {
+                        isGoto = true;
+                    }
                     default:
                     {
-                        if (option)
+                        if (option || isGoto)
                         {
                             text += word;
                         }
@@ -313,11 +329,25 @@ class Parser
                 codeText = "";
                 isCode = false;
             }
+            else if (isGoto)
+            {
+                currentBlock.commands.push(Command.createGoto(text));
+                text = "";
+                isGoto = false;
+            }
             else if (option)
             {
                 if (text == "EXCLUSIVE")
                 {
                     currentBlock.isExclusive = true;
+                }
+                else if (text == "NO_CLEAR")
+                {
+                    currentBlock.clearCurrent = false;
+                }
+                else
+                {
+                    currentBlock.options.push(text);
                 }
 
                 text = "";

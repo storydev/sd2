@@ -31,11 +31,16 @@ class CommandBlock
      * The extra data found inside of parenthesis.
      */
     public var extraData:Array<String>;
+    /**
+     * Options that exist within this conversation.
+     */
+    public var options:Array<String>;
     
     public function new()
     {
         commands = [];
         extraData = [];
+        options = [];
         clearCurrent = true;
         isExclusive = false;
         id = 0;
