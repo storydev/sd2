@@ -131,5 +131,32 @@ class Command
         command.data.push(convoName);
         return command;
     }
+
+    public static function createOptionConditional(conditional:String):Command
+    {
+        var command = new Command();
+        command.id = GLOBAL_ID++;
+        command.type = OPTION_CONDITIONAL;
+        command.data.push(conditional);
+        return command;
+    }
+
+    public static function createOption(text:String)
+    {
+        var command = new Command();
+        command.id = GLOBAL_ID++;
+        command.type = OPTION;
+        command.data.push(text);
+        return command;
+    }
+
+    public static function createFallThrough(code:String):Command
+    {
+        var command = new Command();
+        command.id = GLOBAL_ID++;
+        command.type = FALLTHROUGH;
+        command.data.push(code);
+        return command;
+    }
     
 }

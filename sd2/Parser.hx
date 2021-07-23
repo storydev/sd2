@@ -98,11 +98,19 @@ class Parser
             #end
         }
 
+        blocksAdded = validate(content, file);
+
+        return blocksAdded;
+    }
+
+    public function validate(content:String, file:String):Int
+    {
         var lines = content.split("\n");
+        var lastCommand:Command;
         currentBlock = null;
         isAChoice = false;
         isDialogueBlock = false;
-        blocksAdded = 0;
+        var blocks = 0;
 
         // setup the local variables
         // don't need tokenisation because we are simple.
@@ -121,7 +129,11 @@ class Parser
         var choiceInstruction = "";
         var optionText = "";
         var option = false;
+        var optionConditional = false;
         var codeText = "";
+        var fallThrough = false;
+        var fallThroughCode = "";
+        var fallThroughEnd = false;
 
         for (i in 0...lines.length)
         {
@@ -143,6 +155,8 @@ class Parser
             var arrow = false;
             while (word != "")
             {
+                var escape = false;
+
                 switch (word)
                 {
                     case ">":
@@ -150,6 +164,13 @@ class Parser
                         if (first)
                         {
                             isAChoice = true;
+                        }
+
+                        if (fallThrough)
+                        {
+                            fallThroughCode = text;
+                            fallThroughEnd = true;
+                            text = "";
                         }
                     }
                     case "->":
@@ -163,6 +184,24 @@ class Parser
                     {
                         if (!isCode)
                             option = true;
+                    }
+                    case "=!":
+                    {
+                        if (!isCode)
+                            optionConditional = true;
+                    }
+                    case "|=":
+                    {
+                        if (first)
+                            fallThrough = true;
+                    }
+                    case "|=>":
+                    {
+                        if (first)
+                        {
+                            fallThrough = true;
+                            fallThroughEnd = true;
+                        }
                     }
                     case "convo", "#":
                     {
@@ -203,16 +242,17 @@ class Parser
                     }
                     default:
                     {
-                        if (option || isGoto)
+                        if (isGoto || optionConditional || fallThrough)
                         {
                             text += word;
                         }
-                        else if (narration || character || dialogue || overlay || convo || isCode)
+                        else if (narration || character || dialogue || overlay || convo || isCode || option)
                         {
                             if (character && word.startsWith("#"))
                                 charColor = word;
                             else if (isCode)
                             {
+                                escape = true;
                                 codeText += value;
                                 break;
                             }
@@ -240,6 +280,9 @@ class Parser
                     }
                 }
 
+                if (escape)
+                    break;
+
                 // set the value to the rest of the line and get the next word.
                 value = data.line;
                 data = getNextWord(value);
@@ -256,7 +299,7 @@ class Parser
                 if (currentBlock != null)
                 {
                     _blocks.push(currentBlock);
-                    blocksAdded++;
+                    blocks++;
                     currentBlock = new CommandBlock();
                 }
                 
@@ -271,37 +314,95 @@ class Parser
             }
             else if (narration)
             {
-                checkChoices();
                 text = text.substr(0, text.length - 1);
-                currentBlock.commands.push(Command.createNarrative(text));
+                lastCommand = Command.createNarrative(text);
+                currentBlock.commands.push(lastCommand);
                 text = "";
                 narration = false;
             }
             else if (character)
             {
-                checkChoices();
                 text = text.substr(0, text.length - 1);
-                _commands.push(Command.createCharacterCommand(text, charColor));
+                lastCommand = Command.createCharacterCommand(text, charColor);
+                _commands.push(lastCommand);
                 text = "";
                 character = false;
             }
             else if (dialogue)
             {
-                checkChoices();
-                text = text.substr(0, text.length - 1);
+                if (text != null)
+                {
+                    if (text != "")
+                        text = text.substr(0, text.length - 1);
+                }
+                
+                if (charName == null || charName == "")
+                {
+                    postError('Invalid syntax on line $i. Expected a dialogue.');
+                    return -1;
+                }
+
                 charName = charName.substr(0, charName.length - 1);
-                currentBlock.commands.push(Command.createDialogue(charName, text));
+                lastCommand = Command.createDialogue(charName, text);
+                currentBlock.commands.push(lastCommand);
                 charName = "";
                 dialogue = false;
                 text = "";
             }
             else if (overlay)
             {
-                checkChoices();
                 text = text.substr(0, text.length - 1);
-                currentBlock.commands.push(Command.createOverlayTitle(text));
+                lastCommand = Command.createOverlayTitle(text);
+                currentBlock.commands.push(lastCommand);
                 text = "";
                 overlay = false;
+            }
+            else if (isGoto)
+            {
+                lastCommand = Command.createGoto(text);
+                currentBlock.commands.push(lastCommand);
+                text = "";
+                isGoto = false;
+            }
+            else if (option)
+            {
+                if (text == "EXCLUSIVE")
+                {
+                    currentBlock.isExclusive = true;
+                }
+                else if (text == "NO_CLEAR")
+                {
+                    currentBlock.clearCurrent = false;
+                }
+                else
+                {
+                    if (lastCommand == null)
+                        currentBlock.options.push(text);
+                    else
+                        currentBlock.commands.push(Command.createOption(text));
+                }
+
+                text = "";
+                option = false;
+            }
+            else if (optionConditional)
+            {
+                currentBlock.commands.push(Command.createOptionConditional(text));
+                text = "";
+                optionConditional = false;
+            }
+            else if (fallThrough)
+            {
+                if (!fallThroughEnd)
+                {
+                    postError('Line $i: Fall through has not ended correctly. You must enter `>` to end the fall through.');
+                    return -1;
+                }
+
+                currentBlock.commands.push(Command.createFallThrough(fallThroughCode));
+                fallThroughCode = "";
+                fallThrough = false;
+                fallThroughEnd = false;
             }
             else if (isAChoice)
             {
@@ -329,30 +430,6 @@ class Parser
                 codeText = "";
                 isCode = false;
             }
-            else if (isGoto)
-            {
-                currentBlock.commands.push(Command.createGoto(text));
-                text = "";
-                isGoto = false;
-            }
-            else if (option)
-            {
-                if (text == "EXCLUSIVE")
-                {
-                    currentBlock.isExclusive = true;
-                }
-                else if (text == "NO_CLEAR")
-                {
-                    currentBlock.clearCurrent = false;
-                }
-                else
-                {
-                    currentBlock.options.push(text);
-                }
-
-                text = "";
-                option = false;
-            }
             else
             {
                 postError('Invalid syntax at line $i. What we\'re you trying to do?');
@@ -365,12 +442,12 @@ class Parser
                 {
                     checkChoices();
                     _blocks.push(currentBlock);
-                    blocksAdded++;
+                    blocks++;
                 }
             }
         }
 
-        return blocksAdded;
+        return blocks;
     }
 
     public function generateContent(block:CommandBlock)
