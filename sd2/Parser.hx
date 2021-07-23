@@ -106,7 +106,7 @@ class Parser
     public function validate(content:String, file:String):Int
     {
         var lines = content.split("\n");
-        var lastCommand:Command;
+        var lastCommand:Command = null;
         currentBlock = null;
         isAChoice = false;
         isDialogueBlock = false;
