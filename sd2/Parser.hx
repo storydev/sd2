@@ -17,6 +17,10 @@ import kha.Assets;
 import kha.Blob;
 #end
 
+#if hscript
+import hscript.Expr;
+#end
+
 #if (sys || hxnodejs)
 import sys.io.File;
 #end
@@ -37,6 +41,26 @@ class Parser
     private var blocksAdded:Int = 0;
 
     public var usingKha:Bool = false;
+
+    /**
+     * The function callback used to parse a string
+     * of code, normally in conjunction with `hscript`.
+     */
+    #if hscript
+    public var parseCodeCb:(String, ?String) -> Expr;
+    #else
+    public var parseCodeCb:(String, ?String) -> Dynamic;
+    #end
+
+    /**
+     * The function callback used to execute or evaluate
+     * code, normally in conjunction with `hscript`.
+     */
+    #if hscript
+    public var executeCodeCb:(Expr) -> Dynamic;
+    #else
+    public var executeCodeCb:(Dynamic) -> Dynamic;
+    #end
     
     public function new()
     {
@@ -484,7 +508,7 @@ class Parser
                 {
                     for (data in command.data)
                     {
-                        var index = data.indexOf(";");
+                        var index = data.indexOf("|");
                         var choiceText = data.substr(0, index);
                         var choiceInstruction = data.substr(index + 1);
                         content += "> " + choiceText + " -> " + choiceInstruction + "\n";
@@ -591,8 +615,219 @@ class Parser
     }
 
     /**
+     * Translate a given block by calculating the Optional Conditionals and Fallthroughs,
+     * returning only the Commands that match any and all conditions. `hscript` must be
+     * used for this function to work as expected. Make sure that `parseCodeCb` and `executeCodeCb`
+     * are assigned before calling this function. 
+     * @param block The block to calculate.
+     * @param options The options, if any, to use for parsing narrative/dialogue.
+     * @return Array<Command>
+     */
+    public function translateBlock(block:CommandBlock, ?options:TranslateOptions):Array<Command>
+    {
+        var results = new Array<Command>();
+
+        if (options == null)
+        {
+            options = {
+                autoParse: false,
+                parseMap: new Map<String, Dynamic>()
+            };
+        }
+
+        var executeFrom = -1;
+        var endExecution = -1;
+        var choicesIndex = -1;
+
+        for (i in 0...block.commands.length)
+        {
+            var command = block.commands[i];
+
+            if (command.type == OPTION_CONDITIONAL)
+            {
+                if (executeFrom == -1)
+                {
+                    var code = command.data[0];
+                    if (code != null)
+                    {
+                        if (code == "")
+                        {
+                            executeFrom = i;
+                            continue;
+                        }
+                    }
+
+                    if (parseCodeCb != null && executeCodeCb != null)
+                    {
+                        var parsed = parseCodeCb(code);
+                        var executed = executeCodeCb(parsed);
+                        var result = Std.is(executed, Bool);
+                        if (result)
+                        {
+                            var casted = cast (executed, Bool);
+                            if (casted)
+                            {
+                                executeFrom = i;
+                                continue;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        executeFrom = i;
+                    }
+                }
+                else
+                {
+                    endExecution = i;
+                    continue;
+                }
+            }
+            else if (command.type == CHOICES)
+            {
+                choicesIndex = i;
+            }
+        }
+
+        var skipToNextFallthrough = false;
+
+        if (executeFrom == -1)
+            executeFrom = 0;
+        
+        if (endExecution == -1)
+            endExecution = block.commands.length;
+
+        for (i in executeFrom...endExecution)
+        {
+            var command = block.commands[i];
+
+            if (command.type == OPTION)
+            {
+                results.push(command);
+            }
+            else if (command.type == FALLTHROUGH && !options.fallThroughRealTime)
+            {
+                var code = command.data[0];
+                if (code != null)
+                {
+                    if (code == "")
+                    {
+                        skipToNextFallthrough = false;
+                        continue;
+                    }
+                }
+
+                if (parseCodeCb != null && executeCodeCb != null)
+                {
+                    var parsed = parseCodeCb(code);
+                    var executed = executeCodeCb(parsed);
+                    if (Std.is(executed, Bool))
+                    {
+                        var casted = cast (executed, Bool);
+                        skipToNextFallthrough = !casted;
+                    }
+                }
+                else
+                {
+                    skipToNextFallthrough = false;
+                }
+            }
+            else
+            {
+                if (!skipToNextFallthrough)
+                {
+                    var text = "";
+                    if (command.type == NARRATIVE || command.type == OVERLAY_TITLE)
+                    {
+                        text = command.data[0];
+                    }
+                    else if (command.type == DIALOGUE)
+                    {
+                        text = command.data[1];
+                    }
+
+                    if (options.autoParse)
+                    {
+                        if (text.indexOf("$") > -1)
+                        {
+                            text = parseText(text, options.parseMap);
+                        }
+                    }
+
+                    if (text != "")
+                    {
+                        if (command.type == NARRATIVE || command.type == OVERLAY_TITLE)
+                        {
+                            command.data[0] = text;
+                        }
+                        else if (command.type == DIALOGUE)
+                        {
+                            command.data[1] = text;
+                        }
+                    }
+
+                    results.push(command);
+                }
+            }
+        }
+
+        if (choicesIndex > -1)
+        {
+            results.push(block.commands[choicesIndex]);
+        }
+
+        return results;
+    }
+
+    private function parseText(text:String, variables:Map<String, Dynamic>):String
+    {
+        var result = "";
+        var isSpace = false;
+        var isVariable = false;
+        var variableName = "";
+        for (i in 0...text.length)
+        {
+            var char = text.charAt(i);
+            if (char == " ")
+            {
+                if (isVariable)
+                {
+                    if (variables.exists(variableName))
+                    {
+                        result += Std.string(variables.get(variableName));
+                    }
+                    variableName = "";
+                }
+
+                isSpace = true;
+                result += char;
+            }
+            else
+            {
+                if (char == "$" && isSpace)
+                {
+                    isVariable = true;
+                }
+                else
+                {
+                    if (isVariable)
+                        variableName += char;
+                    else
+                        result += char;
+                }
+
+                isSpace = false;
+            }
+        }
+
+        return result;
+    }
+
+    /**
     * Return all the parsed blocks/conversations.
     **/
     public function getBlocks() return _blocks;
+    
+
     
 }
