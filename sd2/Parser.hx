@@ -785,10 +785,28 @@ class Parser
         var isSpace = false;
         var isVariable = false;
         var variableName = "";
+        var captured = false;
         for (i in 0...text.length)
         {
             var char = text.charAt(i);
-            if (char == " ")
+            if (captured)
+            {
+                if (char == "}")
+                {
+                    captured = false;
+                    if (variables.exists(variableName))
+                    {
+                        result += Std.string(variables.get(variableName));
+                    }
+                    variableName = "";
+                    isVariable = false;
+                }
+                else
+                {
+                    variableName += char;
+                }
+            }
+            else if (char == " ")
             {
                 if (isVariable)
                 {
@@ -797,10 +815,15 @@ class Parser
                         result += Std.string(variables.get(variableName));
                     }
                     variableName = "";
+                    isVariable = false;
                 }
 
                 isSpace = true;
                 result += char;
+            }
+            else if (char == "{" && isVariable)
+            {
+                captured = true;
             }
             else
             {
